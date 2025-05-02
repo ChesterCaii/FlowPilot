@@ -57,14 +57,20 @@ fi
 if ! check_service "ts-node-dev src/agent.ts" "API server"; then
   echo -e "${YELLOW}Starting API server...${NC}"
   npm run dev:api &
-  sleep 3
+  sleep 5
 fi
+
+# Give extra time for API server to fully initialize
+sleep 5
 
 # Verify all services are running
 echo -e "\n${YELLOW}Verifying all services are running...${NC}"
 check_service "temporal server" "Temporal server"
 check_service "ts-node-dev src/worker.ts" "Worker process"
 check_service "ts-node-dev src/agent.ts" "API server"
+
+# Clear terminal before showing menu
+clear
 
 # Open the Web UI
 open_web_ui() {
@@ -98,44 +104,57 @@ open_web_ui() {
 
 # Demo functions
 demo_memory_leak() {
+  clear
   echo -e "\n${YELLOW}===== DEMO SCENARIO 1: Memory Leak Alert =====${NC}"
+  echo -e "\n${CYAN}• Starting voice narration...${NC}"
   
-  # Use voice narration with specific voice
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('memory-leak', 'max')"
+  # Use voice narration with consistent voice
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('memory-leak')"
   
-  echo -e "${CYAN}Triggering memory-leak alert via API...${NC}"
+  # Wait extra time after speech
+  sleep 5
+  
+  echo -e "\n${CYAN}• Triggering memory-leak alert via API...${NC}"
   
   curl -X POST http://localhost:3000/alarm \
     -H "Content-Type: application/json" \
     -d '{"AlarmName": "memory-leak", "Region": "us-east-1", "Severity": "HIGH"}' \
     -s | jq . || echo "Response: FlowPilot triggered"
   
-  echo -e "${CYAN}Alert triggered! FlowPilot is now:${NC}"
+  # Long pause to allow notifications to finish
+  sleep 8
+  
+  echo -e "\n${CYAN}• Alert triggered! FlowPilot is now:${NC}"
   echo -e "  ${PURPLE}1. Using AWS Bedrock to decide action${NC}"
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('bedrock-deciding', 'max')"
-  sleep 2
+  sleep 3
   
-  echo -e "  ${PURPLE}2. Executing remediation via MCP/A2A protocol${NC}"
-  sleep 1
-  echo -e "  ${PURPLE}3. Creating multi-language reports with DeepL${NC}"
-  sleep 1
-  echo -e "  ${PURPLE}4. Generating system diagrams with Vizcom${NC}"
-  sleep 1
-  echo -e "  ${PURPLE}5. Creating voice alerts with Rime${NC}"
+  # Skip the bedrock narration to prevent overlap with alert
+  echo -e "\n${CYAN}• Bedrock decision in progress...${NC}"
+  sleep 5
   
-  # Give some time for the workflow to complete
-  echo -e "${CYAN}Waiting for workflow to complete...${NC}"
-  for i in {1..10}; do
+  echo -e "\n${CYAN}• Executing remediation:${NC}"
+  echo -e "  ${PURPLE}→ Restarting worker pods via MCP/A2A protocol${NC}"
+  sleep 3
+  echo -e "  ${PURPLE}→ Creating reports with DeepL translations${NC}"
+  sleep 3
+  echo -e "  ${PURPLE}→ Generating system diagrams${NC}"
+  sleep 3
+  echo -e "  ${PURPLE}→ Creating voice alerts with Rime${NC}"
+  
+  # Very long wait for all notifications to complete
+  echo -e "\n${CYAN}• Waiting for workflow to complete...${NC}"
+  for i in {1..12}; do
     echo -n "."
     sleep 1
   done
   echo ""
   
-  # Simulate workflow completion
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('completion', 'grace')"
+  # Skip completion narration to avoid overlap
+  echo -e "\n${CYAN}• Incident resolved successfully!${NC}"
+  sleep 5
   
   # Show generated artifacts
-  echo -e "\n${CYAN}Generated artifacts:${NC}"
+  echo -e "\n${CYAN}• Generated artifacts:${NC}"
   
   # Show latest diagram
   LATEST_DIAGRAM=$(ls -t diagrams/ 2>/dev/null | head -1)
@@ -160,66 +179,87 @@ demo_memory_leak() {
   fi
   
   echo -e "${CYAN}Check the web UI to see the incident details!${NC}"
+  sleep 2
 }
 
 demo_api_failure() {
+  clear
   echo -e "\n${YELLOW}===== DEMO SCENARIO 2: API Failure Alert =====${NC}"
+  echo -e "\n${CYAN}• Starting voice narration...${NC}"
   
-  # Use voice narration with specific voice
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('api-failure', 'rachel')"
+  # Use voice narration with consistent voice
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('api-failure')"
   
-  echo -e "${CYAN}Triggering api-failure alert via API...${NC}"
+  # Wait extra time after speech
+  sleep 5
+  
+  echo -e "\n${CYAN}• Triggering api-failure alert via API...${NC}"
   
   curl -X POST http://localhost:3000/alarm \
     -H "Content-Type: application/json" \
     -d '{"AlarmName": "api-failure", "Region": "us-west-1", "Severity": "CRITICAL"}' \
     -s | jq . || echo "Response: FlowPilot triggered"
   
-  echo -e "${CYAN}Alert triggered! Monitoring MCP streams...${NC}"
+  # Long pause to allow notifications to finish
+  sleep 8
+  
+  echo -e "\n${CYAN}• Alert triggered! Monitoring MCP streams...${NC}"
   
   # Simulate MCP stream monitoring
-  echo -e "${PURPLE}[MCP Stream] Workflow started for api-failure${NC}"
-  sleep 2
-  echo -e "${PURPLE}[MCP Stream] Calling Bedrock for decision...${NC}"
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('bedrock-deciding', 'rachel')"
-  sleep 2
-  echo -e "${PURPLE}[MCP Stream] Decision received: REBOOT${NC}"
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('reboot-decision', 'rachel')"
-  sleep 1
-  echo -e "${PURPLE}[A2A Protocol] Creating task for system-agent${NC}"
-  sleep 2
-  echo -e "${PURPLE}[A2A Protocol] Executing kubectl rollout restart deployment/api-failure-svc -n default${NC}"
+  echo -e "  ${PURPLE}→ Workflow started for api-failure${NC}"
   sleep 3
-  echo -e "${PURPLE}[A2A Protocol] Command execution successful${NC}"
-  sleep 1
-  echo -e "${PURPLE}[MCP Stream] Creating artifacts...${NC}"
+  echo -e "  ${PURPLE}→ Calling Bedrock for decision...${NC}"
+  sleep 3
   
-  # Give some time for the workflow to complete
-  echo -e "${CYAN}Waiting for workflow to complete...${NC}"
-  for i in {1..5}; do
+  # Skip the bedrock narration to prevent overlap with alert
+  echo -e "\n${CYAN}• Bedrock decision in progress...${NC}"
+  sleep 5
+  
+  # Skip reboot decision narration
+  echo -e "\n${CYAN}• Decision received: REBOOT${NC}"
+  sleep 5
+  
+  echo -e "\n${CYAN}• Executing remediation:${NC}"
+  echo -e "  ${PURPLE}→ Creating task for system-agent${NC}"
+  sleep 3
+  echo -e "  ${PURPLE}→ Executing: kubectl rollout restart deployment/api-failure-svc -n default${NC}"
+  sleep 3
+  echo -e "  ${PURPLE}→ Command execution successful${NC}"
+  sleep 3
+  echo -e "  ${PURPLE}→ Creating artifacts...${NC}"
+  
+  # Very long wait for all notifications to complete
+  echo -e "\n${CYAN}• Waiting for workflow to complete...${NC}"
+  for i in {1..12}; do
     echo -n "."
     sleep 1
   done
   echo ""
   
-  # Simulate workflow completion
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('completion', 'grace')"
+  # Skip completion narration to avoid overlap
+  echo -e "\n${CYAN}• Incident resolved successfully!${NC}"
+  sleep 5
   
-  echo -e "${CYAN}Check the web UI to see the incident details!${NC}"
+  echo -e "\n${CYAN}• Check the web UI to see the incident details!${NC}"
 }
 
 demo_mcp_integration() {
+  clear
   echo -e "\n${YELLOW}===== DEMO: MCP/A2A Protocol Integration =====${NC}"
+  echo -e "\n${CYAN}• Starting voice narration...${NC}"
   
-  # Use voice narration with specific voice
-  npx ts-node -e "require('./src/utils/rime').narrateDemo('mcp', 'josh')"
+  # Use voice narration with consistent voice
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('mcp')"
   
-  echo -e "${CYAN}Running the MCP integration demonstration...${NC}"
+  # Wait extra time after speech
+  sleep 5
+  
+  echo -e "\n${CYAN}• Running the MCP integration demonstration...${NC}"
   
   # Run the MCP demo script
   npx ts-node src/mcp-integration.ts
   
-  echo -e "\n${CYAN}MCP/A2A protocol demonstration completed!${NC}"
+  echo -e "\n${CYAN}• MCP/A2A protocol demonstration completed!${NC}"
 }
 
 # Main demo sequence
@@ -231,7 +271,16 @@ echo -e "  ${CYAN}4. MCP/A2A Protocol Demo${NC}"
 echo -e "  ${CYAN}5. Run Full Demo (Web UI + All Scenarios)${NC}"
 echo -e "  ${CYAN}0. Exit${NC}"
 
+# Ensure we wait for input on a clean line
+echo ""
+echo -e "${YELLOW}FlowPilot is waiting for your selection...${NC}"
 read -p "Enter your choice (0-5): " choice
+
+# Wait for user input before proceeding
+sleep 1
+
+# Clear any buffered input
+read -t 0.1 -n 1000 discard || true
 
 case $choice in
   1)
@@ -248,14 +297,20 @@ case $choice in
     ;;
   5)
     # Welcome narration
-    npx ts-node -e "require('./src/utils/rime').narrateDemo('start', 'grace')"
+    clear
+    echo -e "\n${YELLOW}===== Complete FlowPilot Demo =====${NC}"
+    echo -e "\n${CYAN}• Starting welcome narration...${NC}"
+    npx ts-node -e "require('./src/utils/rime').narrateDemo('start')"
+    
+    # Wait extra time after speech
+    sleep 5
     
     open_web_ui
-    sleep 3
+    sleep 15 # Increased delay
     demo_memory_leak
-    sleep 3
+    sleep 20 # Much longer delay between demos
     demo_api_failure
-    sleep 3
+    sleep 20 # Much longer delay between demos
     demo_mcp_integration
     ;;
   *)
