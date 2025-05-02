@@ -206,6 +206,9 @@ const deepl = new Translator(process.env.DEEPL_API_KEY!);
 
 interface TranslationResult { lang: string; text: string; }
 
+// Create a global lock for alert notifications
+let alertInProgress = false;
+
 export const summarize = withMcp("summarize", async (
   report: string
 ): Promise<TranslationResult[]> => {
@@ -222,10 +225,21 @@ export const summarize = withMcp("summarize", async (
   }
   results.forEach(r => console.log(`[${r.lang}]: ${r.text}`));
   
-  // After translations are done, generate diagram and voice alert
+  // Sequence operations with delays to prevent voice overlaps
   try {
+    // First generate ASCII diagram (removed Vizcom API call)
     await generateDiagram(report);
-    await speakAlert(report);
+    
+    // Very long wait before voice alert to prevent any overlap
+    console.log("Waiting 15 seconds before generating voice alert...");
+    await new Promise(resolve => setTimeout(resolve, 15000));
+    
+    // Only generate voice alert if no other alert is in progress
+    if (!alertInProgress) {
+      await speakAlert(report);
+    } else {
+      console.log("⚠️ Skipping voice alert because another alert is in progress");
+    }
   } catch (err) {
     console.error("Error with post-translation actions:", err);
   }
@@ -234,255 +248,104 @@ export const summarize = withMcp("summarize", async (
 });
 
 // ──────────────────────────────────────────────────────────
-// 4) Vizcom diagram generation ($3000 prize)
+// 4) ASCII diagram generation (removed Vizcom API)
 // ──────────────────────────────────────────────────────────
 export const generateDiagram = withMcp("generateDiagram", async (
   report: string
 ): Promise<string> => {
-  console.log("🎨 Generating system diagram with Vizcom...");
+  console.log("🎨 Generating system diagram...");
   
-  if (!process.env.VIZCOM_KEY) {
-    console.log("⚠️ VIZCOM_KEY not found in .env, using mock diagram");
-    
-    // Create a mock diagram based on the incident type
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const incidentType = report.includes("memory-leak") ? "memory-leak" : 
-                         report.includes("api-failure") ? "api-failure" : "generic";
-    
-    const filename = `mock-diagram-${incidentType}-${timestamp}.txt`;
-    const filepath = path.join(process.cwd(), 'diagrams', filename);
-    
-    // Create diagrams directory if it doesn't exist
-    if (!fs.existsSync(path.join(process.cwd(), 'diagrams'))) {
-      fs.mkdirSync(path.join(process.cwd(), 'diagrams'));
-    }
-    
-    // Create a specific ASCII art diagram based on incident type
-    let mockDiagram = "";
-    
-    if (incidentType === "memory-leak") {
-      mockDiagram = `
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |     API Service     |<---->|    Database Server  |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-             ^                           ^
-             |                           |
-             v                           v
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |    Worker Pods      |<---->|  Monitoring System  |
-    |   [MEMORY LEAK]     |      |                     |
-    +---------------------+      +---------------------+
-     
-    +------------------------------------------+
-    | Memory Leak Analysis:                    |
-    | - Process using excessive memory         |
-    | - Memory growing uncontrollably          |
-    | - High risk of OOM crash                 |
-    | - Remediation: Restart affected service  |
-    +------------------------------------------+
-    
-    Incident: ${report}
-    `;
-    } else if (incidentType === "api-failure") {
-      mockDiagram = `
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |  Load Balancer      |<---->| API Gateway Service |
-    |                     |      |    [FAILURE]        |
-    +---------------------+      +---------------------+
-             ^                           ^
-             |                           |
-             v                           v
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |   User Requests     |      |   Backend Services  |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-     
-    +------------------------------------------+
-    | API Failure Analysis:                    |
-    | - Gateway service not responding         |
-    | - HTTP 503 errors reported               |
-    | - Critical impact on user traffic        |
-    | - Remediation: Reboot API service        |
-    +------------------------------------------+
-    
-    Incident: ${report}
-    `;
-    } else {
-      mockDiagram = `
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |   Cloud Services    |<---->|    Microservices    |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-             ^                           ^
-             |                           |
-             v                           v
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |    Client Apps      |<---->|   Data Storage      |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-    
-    Incident: ${report}
-    `;
-    }
-    
-    fs.writeFileSync(filepath, mockDiagram);
-    console.log(`✅ Mock diagram saved to ${filepath}`);
-    return filepath;
+  // Create a diagram based on the incident type
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const incidentType = report.includes("memory-leak") ? "memory-leak" : 
+                     report.includes("api-failure") ? "api-failure" : "generic";
+  
+  const filename = `ascii-diagram-${incidentType}-${timestamp}.txt`;
+  const filepath = path.join(process.cwd(), 'diagrams', filename);
+  
+  // Create diagrams directory if it doesn't exist
+  if (!fs.existsSync(path.join(process.cwd(), 'diagrams'))) {
+    fs.mkdirSync(path.join(process.cwd(), 'diagrams'));
   }
+  
+  // Create a specific ASCII art diagram based on incident type
+  let asciiDiagram = "";
+  
+  if (incidentType === "memory-leak") {
+    asciiDiagram = `
++---------------------+      +---------------------+
+|                     |      |                     |
+|     API Service     |<---->|    Database Server  |
+|                     |      |                     |
++---------------------+      +---------------------+
+         ^                           ^
+         |                           |
+         v                           v
++---------------------+      +---------------------+
+|                     |      |                     |
+|    Worker Pods      |<---->|  Monitoring System  |
+|   [MEMORY LEAK]     |      |                     |
++---------------------+      +---------------------+
+ 
++------------------------------------------+
+| Memory Leak Analysis:                    |
+| - Process using excessive memory         |
+| - Memory growing uncontrollably          |
+| - High risk of OOM crash                 |
+| - Remediation: Restart affected service  |
++------------------------------------------+
 
-  try {
-    // Enhance the prompt based on incident type
-    let diagramPrompt = "";
-    if (report.includes("memory-leak")) {
-      diagramPrompt = `Create a technical diagram showing a system experiencing a memory leak. 
-        Include affected worker pods, monitoring systems, and highlight the memory leak area with warning indicators.
-        Details: ${report}`;
-    } else if (report.includes("api-failure")) {
-      diagramPrompt = `Create a technical diagram showing an API failure scenario.
-        Show load balancers, API gateways, and backend services with the API gateway marked as failing.
-        Include error connections and warning indicators.
-        Details: ${report}`;
-    } else {
-      diagramPrompt = `Create a technical diagram showing the system state for this incident: ${report}. 
-        Show affected components, connections between services, and highlight the issue area.`;
-    }
-    
-    console.log(`Sending prompt to Vizcom: "${diagramPrompt.substring(0, 50)}..."`);
-    
-    const response = await axios.post(
-      "https://api.vizcom.ai/v1/generate",
-      { prompt: diagramPrompt },
-      { 
-        headers: {
-          "Authorization": `Bearer ${process.env.VIZCOM_KEY}`,
-          "Content-Type": "application/json"
-        },
-        responseType: 'arraybuffer'
-      }
-    );
-    
-    console.log("Vizcom response received, status:", response.status);
-    
-    // Save the diagram to a file
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const incidentType = report.includes("memory-leak") ? "memory-leak" : 
-                         report.includes("api-failure") ? "api-failure" : "generic";
-    const filename = `diagram-${incidentType}-${timestamp}.png`;
-    const filepath = path.join(process.cwd(), 'diagrams', filename);
-    
-    // Create diagrams directory if it doesn't exist
-    if (!fs.existsSync(path.join(process.cwd(), 'diagrams'))) {
-      fs.mkdirSync(path.join(process.cwd(), 'diagrams'));
-    }
-    
-    fs.writeFileSync(filepath, response.data);
-    console.log(`✅ Diagram saved to ${filepath}`);
-    return filepath;
-  } catch (err: any) {
-    console.error("❌ Vizcom diagram generation failed:", err.message);
-    if (err.response) {
-      console.error("Response status:", err.response.status);
-      console.error("Response data:", err.response.data);
-    }
-    
-    // Fall back to creating a mock diagram on error
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const incidentType = report.includes("memory-leak") ? "memory-leak" : 
-                         report.includes("api-failure") ? "api-failure" : "generic";
-    const filename = `fallback-diagram-${incidentType}-${timestamp}.txt`;
-    const filepath = path.join(process.cwd(), 'diagrams', filename);
-    
-    // Create diagrams directory if it doesn't exist
-    if (!fs.existsSync(path.join(process.cwd(), 'diagrams'))) {
-      fs.mkdirSync(path.join(process.cwd(), 'diagrams'));
-    }
-    
-    // Use the incident-specific diagrams defined above
-    let mockDiagram = "";
-    
-    if (incidentType === "memory-leak") {
-      mockDiagram = `
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |     API Service     |<---->|    Database Server  |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-             ^                           ^
-             |                           |
-             v                           v
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |    Worker Pods      |<---->|  Monitoring System  |
-    |   [MEMORY LEAK]     |      |                     |
-    +---------------------+      +---------------------+
-     
-    +------------------------------------------+
-    | Memory Leak Analysis:                    |
-    | - Process using excessive memory         |
-    | - Memory growing uncontrollably          |
-    | - High risk of OOM crash                 |
-    | - Remediation: Restart affected service  |
-    +------------------------------------------+
-    
-    Incident: ${report}
-    `;
-    } else if (incidentType === "api-failure") {
-      mockDiagram = `
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |  Load Balancer      |<---->| API Gateway Service |
-    |                     |      |    [FAILURE]        |
-    +---------------------+      +---------------------+
-             ^                           ^
-             |                           |
-             v                           v
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |   User Requests     |      |   Backend Services  |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-     
-    +------------------------------------------+
-    | API Failure Analysis:                    |
-    | - Gateway service not responding         |
-    | - HTTP 503 errors reported               |
-    | - Critical impact on user traffic        |
-    | - Remediation: Reboot API service        |
-    +------------------------------------------+
-    
-    Incident: ${report}
-    `;
-    } else {
-      mockDiagram = `
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |   Cloud Services    |<---->|    Microservices    |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-             ^                           ^
-             |                           |
-             v                           v
-    +---------------------+      +---------------------+
-    |                     |      |                     |
-    |    Client Apps      |<---->|   Data Storage      |
-    |                     |      |                     |
-    +---------------------+      +---------------------+
-    
-    Incident: ${report}
-    `;
-    }
-    
-    fs.writeFileSync(filepath, mockDiagram);
-    console.log(`✅ Fallback diagram saved to ${filepath}`);
-    return filepath;
+Incident: ${report}
+`;
+  } else if (incidentType === "api-failure") {
+    asciiDiagram = `
++---------------------+      +---------------------+
+|                     |      |                     |
+|  Load Balancer      |<---->| API Gateway Service |
+|                     |      |    [FAILURE]        |
++---------------------+      +---------------------+
+         ^                           ^
+         |                           |
+         v                           v
++---------------------+      +---------------------+
+|                     |      |                     |
+|   User Requests     |      |   Backend Services  |
+|                     |      |                     |
++---------------------+      +---------------------+
+ 
++------------------------------------------+
+| API Failure Analysis:                    |
+| - Gateway service not responding         |
+| - HTTP 503 errors reported               |
+| - Critical impact on user traffic        |
+| - Remediation: Reboot API service        |
++------------------------------------------+
+
+Incident: ${report}
+`;
+  } else {
+    asciiDiagram = `
++---------------------+      +---------------------+
+|                     |      |                     |
+|   Cloud Services    |<---->|    Microservices    |
+|                     |      |                     |
++---------------------+      +---------------------+
+         ^                           ^
+         |                           |
+         v                           v
++---------------------+      +---------------------+
+|                     |      |                     |
+|    Client Apps      |<---->|   Data Storage      |
+|                     |      |                     |
++---------------------+      +---------------------+
+
+Incident: ${report}
+`;
   }
+  
+  fs.writeFileSync(filepath, asciiDiagram);
+  console.log(`✅ ASCII diagram saved to ${filepath}`);
+  return filepath;
 });
 
 // ──────────────────────────────────────────────────────────
@@ -491,14 +354,30 @@ export const generateDiagram = withMcp("generateDiagram", async (
 export const speakAlert = withMcp("speakAlert", async (
   message: string
 ): Promise<string> => {
-  console.log("🔊 Creating voice alert with Rime...");
+  // Set lock to prevent overlapping alerts
+  if (alertInProgress) {
+    console.log("⚠️ Another alert is already in progress, skipping this one");
+    return "skipped-due-to-overlap";
+  }
   
-  // Create a professional voice alert with incident details
-  const speechContent = `Alert notification: ${message}`;
+  alertInProgress = true;
+  console.log("🔒 Alert lock engaged - preventing other alerts");
   
   try {
-    // Use the orion voice from Rime's Arcana model for a professional male voice
-    const audioPath = await speak(speechContent, true, "orion", "arcana");
+    console.log("🔊 Creating voice alert with Rime...");
+    
+    // Create a professional voice alert with simplified content
+    let speechContent = "";
+    
+    // Use one very simple message for all alerts to avoid any issues
+    speechContent = "Alert notification. An incident has been detected.";
+    
+    // Use the rachel voice from Rime's Arcana model for a professional female voice
+    const audioPath = await speak(speechContent, true, "rachel", "arcana");
+    
+    // Add extra delay after speaking to ensure no overlap
+    console.log("Adding 5 second delay after alert speech...");
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
     if (audioPath) {
       console.log(`✅ Voice alert created at ${audioPath}`);
@@ -511,7 +390,7 @@ export const speakAlert = withMcp("speakAlert", async (
     
     // Create a mock audio file on failure
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `mock-alert-${timestamp}.txt`;
+    const filename = `alert-text-${timestamp}.txt`;
     const filepath = path.join(process.cwd(), 'audio', filename);
     
     // Create audio directory if it doesn't exist
@@ -520,10 +399,17 @@ export const speakAlert = withMcp("speakAlert", async (
     }
     
     // Create a text file with the intended speech content
-    fs.writeFileSync(filepath, `MOCK AUDIO FILE: ${speechContent}`);
-    console.log(`✅ Mock audio file saved to ${filepath} (Rime API failed)`);
+    fs.writeFileSync(filepath, "Alert notification. An incident has been detected.");
+    console.log(`✅ Text alert saved to ${filepath} (Rime API failed)`);
     
     return filepath;
+  } finally {
+    // Release the lock after a long delay to ensure no overlap
+    console.log("Waiting 10 more seconds before releasing alert lock...");
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    
+    alertInProgress = false;
+    console.log("🔓 Alert lock released");
   }
 });
 
