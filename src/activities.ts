@@ -28,53 +28,79 @@ export const decideAction = withMcp("decideAction", async (
 Should I REBOOT or IGNORE? Respond with exactly one word: REBOOT or IGNORE.`;
 
   // Debug: show which model & region we're using
-  const modelId = process.env.BEDROCK_MODEL_ID!;
-  console.log(`DEBUG: BEDROCK_MODEL_ID=${modelId}, AWS_REGION=${process.env.AWS_REGION}`);
+  const modelId = process.env.BEDROCK_MODEL_ID || "amazon.titan-text-express-v1";
+  console.log(`DEBUG: Using model: ${modelId} in region: ${process.env.AWS_REGION}`);
 
-  // Build base params
-  const params: any = {
-    modelId,
-    contentType: "application/json",
-    accept: "application/json",
-  };
-
-  // Branch body shape for Titan on-demand vs. Claude provisioned
-  if (modelId.startsWith("amazon.titan-text")) {
-    params.body = JSON.stringify({
-      inputText: prompt,
-      textGenerationConfig: {
-        maxTokenCount: 10,
-        stopSequences: [],
-        temperature: 0,
-        topP: 1.0,
-      },
-    });
+  // Build params based on model type
+  let params: any;
+  
+  if (modelId.includes("titan")) {
+    console.log("Using Titan model format");
+    params = {
+      modelId,
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify({
+        inputText: prompt,
+        textGenerationConfig: {
+          maxTokenCount: 10,
+          stopSequences: [],
+          temperature: 0,
+          topP: 1.0,
+        },
+      }),
+    };
+  } else if (modelId.includes("claude")) {
+    console.log("Using Claude model format");
+    params = {
+      modelId,
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify({
+        anthropic_version: "bedrock-2023-05-31",
+        max_tokens: 10,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    };
   } else {
-    params.body = JSON.stringify({
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 10,
-      messages: [{ role: "user", content: prompt }],
-    });
+    console.log("Using generic model format - defaulting to Titan");
+    params = {
+      modelId: "amazon.titan-text-express-v1",
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify({
+        inputText: prompt,
+        textGenerationConfig: {
+          maxTokenCount: 10,
+          stopSequences: [],
+          temperature: 0,
+          topP: 1.0,
+        },
+      }),
+    };
   }
 
   // Debug: show exact payload sent to Bedrock
-  console.log("❓ Bedrock request payload:", params.body);
+  console.log("❓ Bedrock request payload:", JSON.stringify(params, null, 2));
 
   try {
     console.log("Invoking Bedrock…");
     const response = await (bedrock as any).invokeModel(params).promise();
     const body = JSON.parse(response.body.toString());
+    console.log("✅ Bedrock raw response:", JSON.stringify(body, null, 2));
 
     // Extract raw text depending on model type
     let raw: string;
-    if (modelId.startsWith("amazon.titan-text")) {
-      raw = (body.outputText || body.generatedText || "").trim().toUpperCase();
-    } else {
+    if (modelId.includes("titan")) {
+      raw = (body.outputText || body.results?.[0]?.outputText || "").trim().toUpperCase();
+    } else if (modelId.includes("claude")) {
       raw = (body.content?.[0]?.text || "").trim().toUpperCase();
+    } else {
+      raw = (body.outputText || body.results?.[0]?.outputText || body.content?.[0]?.text || "").trim().toUpperCase();
     }
 
-    console.log(`Raw Bedrock response: ${raw}`);
-    return raw === "REBOOT" ? "REBOOT" : "IGNORE";
+    console.log(`Raw Bedrock response text: ${raw}`);
+    return raw.includes("REBOOT") ? "REBOOT" : "IGNORE";
   } catch (err) {
     console.error("Bedrock error:", err);
     return "IGNORE";
@@ -145,14 +171,48 @@ export const generateDiagram = withMcp("generateDiagram", async (
   console.log("🎨 Generating system diagram with Vizcom...");
   
   if (!process.env.VIZCOM_KEY) {
-    console.log("VIZCOM_KEY not found, using mock diagram");
-    return "mock-diagram.png";
+    console.log("⚠️ VIZCOM_KEY not found in .env, using mock diagram");
+    
+    // Create a mock diagram file
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `mock-diagram-${timestamp}.txt`;
+    const filepath = path.join(process.cwd(), 'diagrams', filename);
+    
+    // Create diagrams directory if it doesn't exist
+    if (!fs.existsSync(path.join(process.cwd(), 'diagrams'))) {
+      fs.mkdirSync(path.join(process.cwd(), 'diagrams'));
+    }
+    
+    // Create a simple ASCII art diagram
+    const mockDiagram = `
+    +---------------------+      +---------------------+
+    |                     |      |                     |
+    |     API Service     |<---->|    Database Server  |
+    |                     |      |                     |
+    +---------------------+      +---------------------+
+             ^                           ^
+             |                           |
+             v                           v
+    +---------------------+      +---------------------+
+    |                     |      |                     |
+    |    Worker Pods      |<---->|  Monitoring System  |
+    |                     |      |                     |
+    +---------------------+      +---------------------+
+    
+    Incident: ${report}
+    `;
+    
+    fs.writeFileSync(filepath, mockDiagram);
+    console.log(`✅ Mock diagram saved to ${filepath}`);
+    return filepath;
   }
 
   try {
     // Enhance the prompt to create a better system diagram
     const diagramPrompt = `Create a technical diagram showing the system state for this incident: ${report}. 
       Show affected components, connections between services, and highlight the issue area.`;
+    
+    console.log(`Sending prompt to Vizcom: "${diagramPrompt.substring(0, 50)}..."`);
     
     const response = await axios.post(
       "https://api.vizcom.ai/v1/generate",
@@ -165,6 +225,8 @@ export const generateDiagram = withMcp("generateDiagram", async (
         responseType: 'arraybuffer'
       }
     );
+    
+    console.log("Vizcom response received, status:", response.status);
     
     // Save the diagram to a file
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -179,9 +241,45 @@ export const generateDiagram = withMcp("generateDiagram", async (
     fs.writeFileSync(filepath, response.data);
     console.log(`✅ Diagram saved to ${filepath}`);
     return filepath;
-  } catch (err) {
-    console.error("❌ Vizcom diagram generation failed:", err);
-    return "Failed to generate diagram";
+  } catch (err: any) {
+    console.error("❌ Vizcom diagram generation failed:", err.message);
+    if (err.response) {
+      console.error("Response status:", err.response.status);
+      console.error("Response data:", err.response.data);
+    }
+    
+    // Fall back to creating a mock diagram on error
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `fallback-diagram-${timestamp}.txt`;
+    const filepath = path.join(process.cwd(), 'diagrams', filename);
+    
+    // Create diagrams directory if it doesn't exist
+    if (!fs.existsSync(path.join(process.cwd(), 'diagrams'))) {
+      fs.mkdirSync(path.join(process.cwd(), 'diagrams'));
+    }
+    
+    // Create a simple ASCII art diagram
+    const mockDiagram = `
+    +---------------------+      +---------------------+
+    |                     |      |                     |
+    |     API Service     |<---->|    Database Server  |
+    |                     |      |                     |
+    +---------------------+      +---------------------+
+             ^                           ^
+             |                           |
+             v                           v
+    +---------------------+      +---------------------+
+    |                     |      |                     |
+    |    Worker Pods      |<---->|  Monitoring System  |
+    |                     |      |                     |
+    +---------------------+      +---------------------+
+    
+    Incident: ${report}
+    `;
+    
+    fs.writeFileSync(filepath, mockDiagram);
+    console.log(`✅ Fallback diagram saved to ${filepath}`);
+    return filepath;
   }
 });
 
@@ -194,20 +292,22 @@ export const speakAlert = withMcp("speakAlert", async (
   console.log("🔊 Creating voice alert with Rime...");
   
   if (!process.env.RIME_KEY) {
-    console.log("RIME_KEY not found, skipping voice alert");
+    console.log("⚠️ RIME_KEY not found in .env, skipping voice alert");
     return;
   }
 
+  // Create a concise version of the message for speech - moved outside try/catch
+  const speechContent = `Alert! ${message.substring(0, 200)}`;
+  
   try {
-    // Create a concise version of the message for speech
-    const speechContent = `Alert! ${message.substring(0, 200)}`;
+    console.log(`Sending speech content to Rime: "${speechContent.substring(0, 50)}..."`);
     
+    // Try a different endpoint format
     const response = await axios.post(
-      "https://api.rime.ai/v1/speak",
+      "https://api.rime.ai/v1/audio/speech/synthesize",
       {
         text: speechContent,
-        voice_id: "calm", // Use a calm voice for alerts
-        audio_format: "mp3"
+        voice: "default"
       },
       {
         headers: {
@@ -217,6 +317,8 @@ export const speakAlert = withMcp("speakAlert", async (
         responseType: 'arraybuffer'
       }
     );
+    
+    console.log("Rime response received, status:", response.status);
     
     // Save the audio file
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -233,8 +335,37 @@ export const speakAlert = withMcp("speakAlert", async (
     
     // TODO: Add code to play the audio file (platform dependent)
     console.log("🔊 Voice alert generated! Would play audio in production.");
-  } catch (err) {
-    console.error("❌ Rime voice generation failed:", err);
+  } catch (err: any) {
+    console.error("❌ Rime voice generation failed:", err.message);
+    if (err.response) {
+      console.error("Response status:", err.response.status);
+      console.error("Response headers:", JSON.stringify(err.response.headers));
+      // Try to parse the response data if it's a buffer
+      if (err.response.data instanceof Buffer) {
+        try {
+          const jsonStr = err.response.data.toString('utf8');
+          console.error("Response data:", jsonStr);
+        } catch (e) {
+          console.error("Response data is binary and couldn't be parsed");
+        }
+      } else {
+        console.error("Response data:", err.response.data);
+      }
+    }
+    
+    // Create a mock audio file on failure
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `mock-alert-${timestamp}.txt`;
+    const filepath = path.join(process.cwd(), 'audio', filename);
+    
+    // Create audio directory if it doesn't exist
+    if (!fs.existsSync(path.join(process.cwd(), 'audio'))) {
+      fs.mkdirSync(path.join(process.cwd(), 'audio'));
+    }
+    
+    // Create a text file with the intended speech content
+    fs.writeFileSync(filepath, `MOCK AUDIO FILE: ${speechContent}`);
+    console.log(`✅ Mock audio file saved to ${filepath} (Rime API failed)`);
   }
 });
 
