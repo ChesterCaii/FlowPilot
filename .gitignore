@@ -16,3 +16,5 @@ dist/
 
 # OS files
 .DS_Store
+audio/
+diagrams/

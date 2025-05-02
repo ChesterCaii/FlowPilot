@@ -9,31 +9,28 @@ FlowPilot is a SaaS agent that "stands in" for your on-call engineer. It:
 1. **Senses** CloudWatch alarms via webhook
 2. **Reasons** via AWS Bedrock (Claude or Titan)
 3. **Executes** remediation actions (pod restarts via kubectl or Block/Goose)
-4. **Communicates** with multi-language reports (DeepL), diagrams (Vizcom), and voice alerts (Rime)
+4. **Communicates** with multi-language reports (DeepL), diagrams, and voice alerts (Rime)
 
 Built on Temporal for durable workflows and wrapped in MCP so the LLM can directly call out to sponsor tools.
 
 ## Key Features
 
-- 🧠 **AI-Driven Decision Making**: Uses AWS Bedrock (Claude 3 Sonnet or Titan) to decide whether to reboot or ignore alerts
+- 🧠 **AI-Driven Decision Making**: Uses AWS Bedrock (Claude 3 Sonnet) to decide whether to reboot or ignore alerts
 - 🔄 **Automated Remediation**: Executes kubernetes commands to restart failing services
 - 🌎 **Multi-Language Reports**: Automatically translates incident reports to French and German using DeepL
-- 📊 **Visual Incident Diagrams**: Generates system diagrams of affected components using Vizcom
+- 📊 **Visual Incident Diagrams**: Generates system diagrams of affected components
 - 🔊 **Voice Alerts**: Converts incident reports to voice alerts using Rime
-- 📈 **Evaluation Metrics**: Logs decision quality to Arize for continuous improvement
 - ⏱️ **Durable Workflows**: Built on Temporal to ensure reliable execution even during failures
 - 🖥️ **Interactive Dashboard**: Web UI to monitor incidents, view diagrams, and hear voice alerts
 
 ## Sponsor Integrations
 
 - **Temporal**: Core workflow orchestration with durable execution and retries
-- **AWS Bedrock**: AI decisioning using Claude 3 Sonnet or Titan models
+- **AWS Bedrock**: AI decisioning using Claude 3 Sonnet model
 - **DeepL**: Multi-language translation of incident reports
 - **Block/Goose**: Secure command execution (simulated in development)
-- **Vizcom**: Diagram generation for visual incident representation
 - **Rime**: Voice alert generation for audible notifications
-- **Arize**: Evaluation metrics for AI decision quality
-- **MCP/A2A Protocol**: Standardized agent-to-agent communication
+- **MCP/guMCP Protocol**: Standardized agent-to-agent communication
 
 ## Setup Instructions
 
@@ -68,14 +65,8 @@ BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
 # DeepL API for multi-language translation
 DEEPL_API_KEY=your_deepl_api_key
 
-# Vizcom for system diagrams
-VIZCOM_KEY=your_vizcom_api_key
-
 # Rime for voice alerts
 RIME_KEY=your_rime_api_key
-
-# Arize for evaluation metrics
-ARIZE_KEY=your_arize_api_key
 
 # Block/Goose (if using)
 BLOCK_GOOSE_API_KEY=your_goose_api_key
@@ -145,7 +136,7 @@ npx ts-node src/test.ts
 
 ## Demo Scenarios
 
-For hackathon demonstrations, we've prepared several scenarios:
+For hackathon demonstrations, I've prepared several scenarios:
 
 1. **High CPU Usage**: Simulates a service with excessive CPU consumption
 2. **Memory Leak**: Demonstrates the system detecting and remedying a memory leak
@@ -173,11 +164,10 @@ Run a full demo with `./demo.sh` and select option 5.
 This project was created for the AI Agents Hackathon. It targets multiple sponsor prizes:
 
 - Temporal ($2,000): Core workflow orchestration
-- Vizcom ($3,000): Visual intelligence for incident diagrams
 - Rime ($2,000): Voice alerts for incidents
 - DeepL ($1,000-1,500): Multi-language translation
 - Block/Goose ($1,000): Secure command execution
-- Arize ($500): Evaluation metrics for AI decisions
+- guMCP: Standardized agent-to-agent communication
 
 ## License
 
