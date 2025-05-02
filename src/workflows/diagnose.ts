@@ -1,16 +1,49 @@
 import { proxyActivities } from "@temporalio/workflow";
-import type * as acts from "../activities";
+import type { Activities } from "../activities";
 
-const { decideAction, remediate, summarize } = proxyActivities<typeof acts>({
-  startToCloseTimeout: "1 minute"
+// Include all activities we need for our workflow
+const { 
+  decideAction, 
+  executeCommand,      
+  summarize,
+  logEvaluation 
+} = proxyActivities<Activities>({
+  startToCloseTimeout: "1 minute",
 });
 
 export async function diagnose(metricName: string): Promise<void> {
-  const action = await decideAction(metricName);
-  if (action === "REBOOT") {
-    await remediate("payments-1");
-    const report = `Rebooted payments-1 for ${metricName} at ${new Date().toISOString()}`;
-    await summarize(report);
+  // Step 1: Use Bedrock to decide on action
+  const decision = await decideAction(metricName);
+  
+  let report: string;
+  let result: string;
+  let success: boolean = true;
+
+  // Step 2: Take action based on decision
+  if (decision === "REBOOT") {
+    try {
+      const cmd = `kubectl rollout restart deployment/${metricName}-svc -n default`;
+      result = await executeCommand(cmd);
+      report = `✅ Rebooted ${metricName} at ${new Date().toISOString()}. Result: ${result}`;
+      success = true;
+    } catch (error) {
+      result = `Error: ${error}`;
+      report = `❌ Failed to reboot ${metricName} at ${new Date().toISOString()}. Error: ${error}`;
+      success = false;
+    }
+  } else {
+    result = "No action taken";
+    report = `ℹ️ Ignored ${metricName} at ${new Date().toISOString()}, determined no action needed.`;
   }
-  // later: call a DeepL summary step here
+
+  // Step 3: Generate multi-language summary and visualizations
+  await summarize(report);
+  
+  // Step 4: Log the evaluation metrics for learning
+  await logEvaluation({
+    metric: metricName,
+    decision: decision,
+    result: result,
+    correct: success
+  });
 }

@@ -1,18 +1,60 @@
-import { summarize } from './activities';
+import { Connection, Client } from "@temporalio/client";
+import dotenv from "dotenv";
+dotenv.config();
 
-async function testSummarize() {
-  console.log('🧪 Testing summarize function...\n');
+const TEST_METRICS = [
+  "high-cpu-usage",
+  "memory-leak",
+  "database-connection-failure",
+  "api-latency-spike",
+  "disk-space-warning"
+];
+
+async function runTest() {
+  console.log("🚀 FlowPilot Test Harness");
+  console.log("========================\n");
   
-  const testReport = "Critical alert: High CPU usage detected on production server. Memory utilization at 95%. Immediate attention required.";
+  // Connect to Temporal
+  console.log("Connecting to Temporal...");
+  const connection = await Connection.connect();
+  const client = new Client({ connection });
   
+  // Pick a test metric randomly if not specified
+  const testMetricIndex = Math.floor(Math.random() * TEST_METRICS.length);
+  const metricName = process.argv[2] || TEST_METRICS[testMetricIndex];
+  
+  console.log(`\n🔔 Simulating alert for: ${metricName}`);
+  
+  // Start the workflow
   try {
-    const results = await summarize(testReport);
-    console.log('\n✅ Test completed successfully!');
-    console.log('Results structure:', JSON.stringify(results, null, 2));
+    const handle = await client.workflow.start("diagnose", {
+      args: [metricName],
+      taskQueue: "flowpilot",
+      workflowId: `test-${Date.now()}`
+    });
+    
+    console.log(`\n✅ Workflow started with ID: ${handle.workflowId}`);
+    console.log("Waiting for workflow to complete...\n");
+    
+    // Wait for workflow completion
+    await handle.result();
+    console.log("\n🎉 Workflow completed successfully!");
+    
+    // Output the workflow result
+    console.log("\nWorkflow details:");
+    console.log(`- ID: ${handle.workflowId}`);
+    console.log(`- Status: Completed`);
+    console.log(`- Start time: ${new Date().toISOString()}`);
+    console.log(`\nCheck the 'diagrams' and 'audio' directories for generated assets.`);
+    
   } catch (error) {
-    console.error('❌ Test failed:', error);
+    console.error("\n❌ Workflow failed:", error);
   }
+  
+  process.exit(0);
 }
 
-// Run the test
-testSummarize(); 
+runTest().catch(err => {
+  console.error("Test harness error:", err);
+  process.exit(1);
+}); 
