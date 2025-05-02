@@ -97,24 +97,57 @@ export const generateDiagramWithMCP = withMcp("generateDiagram", async (
 export async function demonstrateMCPIntegration(metricName: string): Promise<void> {
   console.log(`🚀 Starting MCP integrated workflow for ${metricName}`);
   
+  // Pause for visibility
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
   // Use MCP to decide action
+  console.log(`\n📊 Step 1: Analyzing and deciding action...`);
   const decision = await decideActionWithMCP(metricName);
+  
+  // Pause for visibility
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  console.log(`\n📈 Decision result: ${decision}`);
   
   if (decision === "REBOOT") {
     // Execute command with A2A notifications
+    console.log(`\n🔄 Step 2: Executing command...`);
     const cmd = `kubectl rollout restart deployment/${metricName}-svc -n default`;
+    
+    // Pause for visibility
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
     const result = await executeCommandWithMCP(cmd);
-    console.log(`Command result: ${result}`);
+    
+    // Pause for visibility
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    console.log(`\n🔧 Command result: ${result}`);
   } else {
-    console.log(`Decision was to ignore ${metricName}`);
+    console.log(`\n⏸️ Decision was to ignore ${metricName}`);
+    
+    // Pause for visibility 
+    await new Promise(resolve => setTimeout(resolve, 1500));
   }
   
   // Generate a diagram with MCP artifact
+  console.log(`\n🖼️ Step 3: Generating diagram...`);
   const report = `Incident report for ${metricName}`;
-  const diagramPath = await generateDiagramWithMCP(report);
-  console.log(`Diagram generated at: ${diagramPath}`);
   
-  console.log(`✅ MCP integration demonstration completed for ${metricName}`);
+  // Pause for visibility
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  const diagramPath = await generateDiagramWithMCP(report);
+  
+  // Pause for visibility
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  console.log(`\n📝 Diagram generated at: ${diagramPath}`);
+  
+  // Final pause for visibility
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  console.log(`\n✅ MCP integration demonstration completed for ${metricName}`);
 }
 
 // This function can be called to demonstrate the MCP integration
