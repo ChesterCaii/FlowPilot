@@ -33,6 +33,15 @@ check_service() {
 # Start services if needed
 echo -e "\n${YELLOW}Checking if required services are running...${NC}"
 
+# Add Rime key check
+if grep -q "RIME_KEY" .env && ! grep -q "RIME_KEY=sk_rime_your_api_key_here" .env; then
+  echo -e "${GREEN}✓ Rime API key is configured in .env${NC}"
+else
+  echo -e "${RED}✗ Rime API key is not properly configured in .env${NC}"
+  echo -e "${YELLOW}Please add your Rime API key to .env file:${NC}"
+  echo -e "${YELLOW}RIME_KEY=your_actual_key_here${NC}"
+fi
+
 if ! check_service "temporal server" "Temporal server"; then
   echo -e "${YELLOW}Starting Temporal server...${NC}"
   npm run dev:temporal &
@@ -61,35 +70,39 @@ check_service "ts-node-dev src/agent.ts" "API server"
 open_web_ui() {
   echo -e "\n${CYAN}Opening FlowPilot Web UI...${NC}"
   
-  # Detect OS and open browser accordingly
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    open "http://localhost:3000"
-  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux
-    xdg-open "http://localhost:3000" &> /dev/null
-  elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-    # Windows
-    start "http://localhost:3000"
-  else
-    echo -e "${YELLOW}Please open http://localhost:3000 in your browser${NC}"
-  fi
+  # Force clear browser cache for FlowPilot dashboard
+  echo -e "${YELLOW}Ensuring fresh dashboard load...${NC}"
   
-  # Open Temporal UI as well
+  # First open FlowPilot dashboard directly
   if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS - open with cache clearing flags
+    open -a "Safari" "http://localhost:3000/static-dashboard.html"
+    sleep 2
+    # Then open Temporal UI in a separate tab
     open "http://localhost:8233"
   elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux
+    xdg-open "http://localhost:3000/static-dashboard.html" &> /dev/null
+    sleep 2
     xdg-open "http://localhost:8233" &> /dev/null
   elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    # Windows
+    start "http://localhost:3000/static-dashboard.html"
+    sleep 2
     start "http://localhost:8233"
   else
-    echo -e "${YELLOW}Please open http://localhost:8233 to view Temporal UI${NC}"
+    echo -e "${YELLOW}Please open http://localhost:3000/static-dashboard.html in your browser${NC}"
+    echo -e "${YELLOW}Also open http://localhost:8233 to view Temporal UI${NC}"
   fi
 }
 
 # Demo functions
 demo_memory_leak() {
   echo -e "\n${YELLOW}===== DEMO SCENARIO 1: Memory Leak Alert =====${NC}"
+  
+  # Use voice narration with specific voice
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('memory-leak', 'max')"
+  
   echo -e "${CYAN}Triggering memory-leak alert via API...${NC}"
   
   curl -X POST http://localhost:3000/alarm \
@@ -99,9 +112,15 @@ demo_memory_leak() {
   
   echo -e "${CYAN}Alert triggered! FlowPilot is now:${NC}"
   echo -e "  ${PURPLE}1. Using AWS Bedrock to decide action${NC}"
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('bedrock-deciding', 'max')"
+  sleep 2
+  
   echo -e "  ${PURPLE}2. Executing remediation via MCP/A2A protocol${NC}"
+  sleep 1
   echo -e "  ${PURPLE}3. Creating multi-language reports with DeepL${NC}"
+  sleep 1
   echo -e "  ${PURPLE}4. Generating system diagrams with Vizcom${NC}"
+  sleep 1
   echo -e "  ${PURPLE}5. Creating voice alerts with Rime${NC}"
   
   # Give some time for the workflow to complete
@@ -111,6 +130,9 @@ demo_memory_leak() {
     sleep 1
   done
   echo ""
+  
+  # Simulate workflow completion
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('completion', 'grace')"
   
   # Show generated artifacts
   echo -e "\n${CYAN}Generated artifacts:${NC}"
@@ -142,6 +164,10 @@ demo_memory_leak() {
 
 demo_api_failure() {
   echo -e "\n${YELLOW}===== DEMO SCENARIO 2: API Failure Alert =====${NC}"
+  
+  # Use voice narration with specific voice
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('api-failure', 'rachel')"
+  
   echo -e "${CYAN}Triggering api-failure alert via API...${NC}"
   
   curl -X POST http://localhost:3000/alarm \
@@ -155,8 +181,10 @@ demo_api_failure() {
   echo -e "${PURPLE}[MCP Stream] Workflow started for api-failure${NC}"
   sleep 2
   echo -e "${PURPLE}[MCP Stream] Calling Bedrock for decision...${NC}"
-  sleep 3
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('bedrock-deciding', 'rachel')"
+  sleep 2
   echo -e "${PURPLE}[MCP Stream] Decision received: REBOOT${NC}"
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('reboot-decision', 'rachel')"
   sleep 1
   echo -e "${PURPLE}[A2A Protocol] Creating task for system-agent${NC}"
   sleep 2
@@ -174,11 +202,18 @@ demo_api_failure() {
   done
   echo ""
   
+  # Simulate workflow completion
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('completion', 'grace')"
+  
   echo -e "${CYAN}Check the web UI to see the incident details!${NC}"
 }
 
 demo_mcp_integration() {
   echo -e "\n${YELLOW}===== DEMO: MCP/A2A Protocol Integration =====${NC}"
+  
+  # Use voice narration with specific voice
+  npx ts-node -e "require('./src/utils/rime').narrateDemo('mcp', 'josh')"
+  
   echo -e "${CYAN}Running the MCP integration demonstration...${NC}"
   
   # Run the MCP demo script
@@ -212,6 +247,9 @@ case $choice in
     demo_mcp_integration
     ;;
   5)
+    # Welcome narration
+    npx ts-node -e "require('./src/utils/rime').narrateDemo('start', 'grace')"
+    
     open_web_ui
     sleep 3
     demo_memory_leak

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowPilot Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding-top: 20px;
+      margin-bottom: 50px;
+    }
+    .incident-card {
+      margin-bottom: 20px;
+      border-left: 5px solid #dc3545;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    .incident-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .incident-card.selected {
+      border-left-color: #007bff;
+      background-color: rgba(0, 123, 255, 0.05);
+    }
+    .incident-card.high {
+      border-left-color: #dc3545;
+    }
+    .incident-card.medium {
+      border-left-color: #ffc107;
+    }
+    .incident-card.low {
+      border-left-color: #28a745;
+    }
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    .status-PROCESSING {
+      background-color: #ffc107;
+    }
+    .status-COMPLETED {
+      background-color: #28a745;
+    }
+    .status-FAILED {
+      background-color: #dc3545;
+    }
+    .incident-details {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    .metrics-card {
+      text-align: center;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      background-color: white;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    .metrics-card h3 {
+      font-size: 2.5rem;
+      margin-bottom: 0;
+    }
+    .decision-tag {
+      font-size: 0.85rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 20px;
+      display: inline-block;
+    }
+    .decision-tag.REBOOT {
+      background-color: #cfe2ff;
+      color: #0a58ca;
+    }
+    .decision-tag.IGNORE {
+      background-color: #e2e3e5;
+      color: #41464b;
+    }
+    .decision-tag.PENDING {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    #status-message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: none;
+    }
+    #refresh-indicator {
+      display: none;
+      margin-left: 10px;
+      font-size: 0.8em;
+    }
+    .refresh-spin {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="status-message" class="alert alert-success"></div>
+  
+  <div class="container">
+    <header class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+      <div class="d-flex align-items-center">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="40" height="40" rx="8" fill="#4e73df"/>
+          <path d="M12 12L20 8L28 12V28L20 32L12 28V12Z" fill="white"/>
+          <circle cx="20" cy="20" r="5" fill="#4e73df"/>
+        </svg>
+        <h1 class="ms-2">FlowPilot Dashboard <span id="refresh-indicator">⟳</span></h1>
+      </div>
+      <div>
+        <button class="btn btn-outline-secondary me-2" id="refresh-dashboard">
+          Refresh Data
+        </button>
+        <button class="btn btn-outline-primary me-2" id="simulate-memory">
+          Simulate Memory Leak
+        </button>
+        <button class="btn btn-outline-danger" id="simulate-api">
+          Simulate API Failure
+        </button>
+      </div>
+    </header>
+    
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="metrics-card">
+          <p class="text-muted mb-1">Total Incidents</p>
+          <h3 id="metric-total">1</h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metrics-card">
+          <p class="text-muted mb-1">Rebooted</p>
+          <h3 id="metric-rebooted">0</h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metrics-card">
+          <p class="text-muted mb-1">Ignored</p>
+          <h3 id="metric-ignored">0</h3>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="metrics-card">
+          <p class="text-muted mb-1">Processing</p>
+          <h3 id="metric-processing">1</h3>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-md-4">
+        <h4 class="mb-3">Recent Incidents</h4>
+        <div id="incidents-container">
+          <!-- Static incident for fallback -->
+          <div class="card incident-card high" data-id="static-incident">
+            <div class="card-body">
+              <h5 class="card-title">
+                <span class="status-indicator status-PROCESSING"></span>
+                memory-leak
+              </h5>
+              <h6 class="card-subtitle mb-2 text-muted">
+                May 2, 2025, 04:19:46
+              </h6>
+              <div class="d-flex justify-content-between align-items-center mt-3">
+                <span class="badge bg-secondary">us-east-1</span>
+                <span class="decision-tag PENDING">PROCESSING</span>
+              </div>
+            </div>
+          </div>
+          <!-- Dynamic incidents will be added here -->
+        </div>
+      </div>
+      
+      <div class="col-md-8">
+        <div class="incident-details">
+          <h4 class="mb-4">Incident Details</h4>
+          
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <strong>Metric:</strong> <span id="detail-metric">memory-leak</span>
+              </div>
+              <div class="mb-3">
+                <strong>Status:</strong> <span id="detail-status">PROCESSING</span>
+              </div>
+              <div class="mb-3">
+                <strong>Region:</strong> <span id="detail-region">us-east-1</span>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <strong>Time:</strong> <span id="detail-time">May 2, 2025, 04:19:46</span>
+              </div>
+              <div class="mb-3">
+                <strong>AI Decision:</strong> <span id="detail-decision" class="decision-tag PENDING">Pending...</span>
+              </div>
+              <div class="mb-3">
+                <strong>Result:</strong> <span id="detail-result">Pending...</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-12">
+              <h5>System Diagram</h5>
+              <div id="diagram-container" class="alert alert-secondary">
+                Diagram will appear here once generated
+              </div>
+            </div>
+          </div>
+          
+          <div class="row mt-4">
+            <div class="col-12" id="audio-container">
+              <!-- Audio will be added here when available -->
+            </div>
+          </div>
+          
+          <div class="row mt-4">
+            <div class="col-12">
+              <h5>Integration Status</h5>
+              <div>
+                <span class="badge bg-primary me-1 mb-1">AWS Bedrock</span>
+                <span class="badge bg-success me-1 mb-1">Temporal</span>
+                <span class="badge bg-info me-1 mb-1">DeepL</span>
+                <span class="badge bg-warning text-dark me-1 mb-1">Vizcom</span>
+                <span class="badge bg-danger me-1 mb-1">Rime</span>
+                <span class="badge bg-secondary me-1 mb-1">MCP/A2A Protocol</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global state
+    let incidents = [];
+    let selectedIncidentId = null;
+    let pollingInterval = null;
+    let incidentDetailsInterval = null;
+    
+    // Hide debug info if present
+    document.addEventListener('DOMContentLoaded', () => {
+      const debugElement = document.getElementById('debug');
+      if (debugElement) {
+        debugElement.style.display = 'none';
+      }
+    });
+    
+    // Utility function to format date
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString();
+    }
+    
+    // Show a status message
+    function showStatusMessage(message, type = 'success') {
+      const statusElement = document.getElementById('status-message');
+      statusElement.textContent = message;
+      statusElement.className = `alert alert-${type}`;
+      statusElement.style.display = 'block';
+      
+      setTimeout(() => {
+        statusElement.style.display = 'none';
+      }, 3000);
+    }
+    
+    // Start refresh indicator
+    function startRefreshIndicator() {
+      const indicator = document.getElementById('refresh-indicator');
+      indicator.style.display = 'inline-block';
+      indicator.classList.add('refresh-spin');
+    }
+    
+    // Stop refresh indicator
+    function stopRefreshIndicator() {
+      const indicator = document.getElementById('refresh-indicator');
+      indicator.style.display = 'none';
+      indicator.classList.remove('refresh-spin');
+    }
+    
+    // Update metrics display
+    function updateMetrics() {
+      document.getElementById('metric-total').textContent = incidents.length || 0;
+      document.getElementById('metric-rebooted').textContent = incidents.filter(i => i.decision === 'REBOOT').length || 0;
+      document.getElementById('metric-ignored').textContent = incidents.filter(i => i.decision === 'IGNORE').length || 0;
+      document.getElementById('metric-processing').textContent = incidents.filter(i => i.status === 'PROCESSING').length || 0;
+    }
+    
+    // Create an incident card
+    function createIncidentCard(incident) {
+      const severityClass = incident.severity?.toLowerCase() || 'medium';
+      
+      const card = document.createElement('div');
+      card.className = `card incident-card ${severityClass}`;
+      card.dataset.id = incident.id;
+      
+      card.innerHTML = `
+        <div class="card-body">
+          <h5 class="card-title">
+            <span class="status-indicator status-${incident.status}"></span>
+            ${incident.metric}
+          </h5>
+          <h6 class="card-subtitle mb-2 text-muted">
+            ${formatDate(incident.timestamp)}
+          </h6>
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="badge bg-secondary">${incident.region}</span>
+            <span class="decision-tag ${incident.decision || 'PENDING'}">${incident.decision || incident.status}</span>
+          </div>
+        </div>
+      `;
+      
+      card.addEventListener('click', () => selectIncident(incident.id));
+      
+      return card;
+    }
+    
+    // Select an incident to display details
+    function selectIncident(incidentId) {
+      // Remove previous selection
+      document.querySelectorAll('.incident-card.selected').forEach(card => {
+        card.classList.remove('selected');
+      });
+      
+      // Mark new selection
+      const card = document.querySelector(`.incident-card[data-id="${incidentId}"]`);
+      if (card) {
+        card.classList.add('selected');
+      }
+      
+      // Find the incident data
+      const incident = incidents.find(inc => inc.id === incidentId) || { 
+        metric: 'Unknown', 
+        status: 'UNKNOWN', 
+        region: 'unknown', 
+        timestamp: new Date()
+      };
+      
+      selectedIncidentId = incidentId;
+      
+      // Update basic details
+      document.getElementById('detail-metric').textContent = incident.metric;
+      document.getElementById('detail-status').textContent = incident.status;
+      document.getElementById('detail-region').textContent = incident.region;
+      document.getElementById('detail-time').textContent = formatDate(incident.timestamp);
+      
+      // Update decision with proper styling
+      const decisionElement = document.getElementById('detail-decision');
+      decisionElement.textContent = incident.decision || 'Pending...';
+      decisionElement.className = `decision-tag ${incident.decision || 'PENDING'}`;
+      
+      // Update result
+      document.getElementById('detail-result').textContent = incident.result || 'Pending...';
+      
+      // Fetch additional details if available
+      fetchIncidentDetails(incidentId);
+    }
+    
+    // Fetch list of incidents
+    function fetchIncidents() {
+      startRefreshIndicator();
+      
+      fetch('/api/incidents')
+        .then(response => {
+          if (!response.ok) throw new Error(`API returned ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          incidents = data;
+          renderIncidents();
+          updateMetrics();
+          
+          // Select first incident if none selected
+          if (incidents.length > 0 && !selectedIncidentId) {
+            selectIncident(incidents[0].id);
+          }
+          
+          stopRefreshIndicator();
+        })
+        .catch(err => {
+          console.error('Failed to fetch incidents:', err);
+          stopRefreshIndicator();
+          // Keep the static incident if fetch fails
+        });
+    }
+    
+    // Fetch details for a specific incident
+    function fetchIncidentDetails(incidentId) {
+      if (!incidentId || incidentId === 'static-incident') return;
+      
+      fetch(`/api/incidents/${incidentId}`)
+        .then(response => {
+          if (!response.ok) throw new Error(`API returned ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          // Update incident in our local cache
+          const index = incidents.findIndex(inc => inc.id === incidentId);
+          if (index !== -1) {
+            incidents[index] = { ...incidents[index], ...data };
+          }
+          
+          // Update diagram if available
+          if (data.artifacts?.diagram) {
+            const diagramContainer = document.getElementById('diagram-container');
+            if (data.artifacts.diagram.endsWith('.txt')) {
+              // Fetch and display text diagram
+              fetch(data.artifacts.diagram)
+                .then(response => response.text())
+                .then(text => {
+                  diagramContainer.innerHTML = `<pre>${text}</pre>`;
+                })
+                .catch(() => {
+                  diagramContainer.textContent = 'Failed to load diagram';
+                });
+            } else {
+              // Display image diagram
+              diagramContainer.innerHTML = `<img src="${data.artifacts.diagram}" alt="System Diagram" class="img-fluid">`;
+            }
+          }
+          
+          // Update audio if available
+          if (data.artifacts?.audio) {
+            const audioContainer = document.getElementById('audio-container');
+            if (data.artifacts.audio.endsWith('.txt')) {
+              // Fetch and display text audio
+              fetch(data.artifacts.audio)
+                .then(response => response.text())
+                .then(text => {
+                  audioContainer.innerHTML = `
+                    <h5>Voice Alert</h5>
+                    <p>${text}</p>
+                    <button class="btn btn-sm btn-outline-primary" onclick="speak('${text.replace(/'/g, "\\'")}')">
+                      Play Voice Alert
+                    </button>
+                  `;
+                })
+                .catch(() => {
+                  audioContainer.innerHTML = '<h5>Voice Alert</h5><p>Failed to load voice alert</p>';
+                });
+            } else {
+              // Display audio player
+              audioContainer.innerHTML = `
+                <h5>Voice Alert</h5>
+                <audio controls src="${data.artifacts.audio}">
+                  Your browser does not support the audio element.
+                </audio>
+              `;
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch incident details:', err);
+        });
+    }
+    
+    // Render the list of incidents
+    function renderIncidents() {
+      const container = document.getElementById('incidents-container');
+      // Clear existing incidents, but keep the static one if no data
+      container.innerHTML = '';
+      
+      if (incidents.length === 0) {
+        // Show static incident as fallback
+        container.innerHTML = `
+          <div class="card incident-card high" data-id="static-incident">
+            <div class="card-body">
+              <h5 class="card-title">
+                <span class="status-indicator status-PROCESSING"></span>
+                memory-leak
+              </h5>
+              <h6 class="card-subtitle mb-2 text-muted">
+                May 2, 2025, 04:19:46
+              </h6>
+              <div class="d-flex justify-content-between align-items-center mt-3">
+                <span class="badge bg-secondary">us-east-1</span>
+                <span class="decision-tag PENDING">PROCESSING</span>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Make it selectable
+        document.querySelector('.incident-card[data-id="static-incident"]')
+          .addEventListener('click', () => selectIncident('static-incident'));
+        
+        return;
+      }
+      
+      // Add real incidents
+      incidents.forEach(incident => {
+        container.appendChild(createIncidentCard(incident));
+      });
+    }
+    
+    // Trigger a new incident
+    function triggerIncident(type, severity = 'HIGH', region = 'us-east-1') {
+      startRefreshIndicator();
+      
+      fetch('/alarm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          AlarmName: type,
+          Severity: severity,
+          Region: region
+        })
+      })
+        .then(response => {
+          if (!response.ok) throw new Error(`API returned ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          showStatusMessage(`Triggered incident: ${type}`);
+          console.log('Triggered incident:', data);
+          
+          // Refresh incidents after a short delay
+          setTimeout(fetchIncidents, 1000);
+        })
+        .catch(err => {
+          console.error('Failed to trigger incident:', err);
+          showStatusMessage(`Failed to trigger incident: ${err.message}`, 'danger');
+          stopRefreshIndicator();
+        });
+    }
+    
+    // Browser speech synthesis for audio playback
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+    
+    // Update details for the selected incident
+    function updateDetails(incident) {
+      if (!incident) return;
+      
+      // Basic details
+      document.getElementById('detail-metric').textContent = incident.metric || '';
+      document.getElementById('detail-region').textContent = incident.region || '';
+      
+      // Status with proper formatting
+      const statusElement = document.getElementById('detail-status');
+      statusElement.textContent = incident.status || 'PROCESSING';
+      statusElement.className = ''; // Reset classes
+      statusElement.classList.add(incident.status ? incident.status.toLowerCase() : 'processing');
+      
+      // Timestamp
+      const timestamp = incident.timestamp ? new Date(incident.timestamp).toLocaleString() : '';
+      document.getElementById('detail-timestamp').textContent = timestamp;
+      
+      // Decision/Result
+      const decisionElement = document.getElementById('detail-decision');
+      if (incident.decision) {
+        decisionElement.innerHTML = `<span class="decision-tag ${incident.decision}">${incident.decision}</span>`;
+      } else {
+        decisionElement.innerHTML = '<span class="decision-tag PENDING">PENDING</span>';
+      }
+      
+      document.getElementById('detail-result').textContent = incident.result || 'Processing...';
+      
+      // Refresh details to get the latest status
+      if (incident.id && incident.id !== 'static-incident') {
+        fetchIncidentDetails(incident.id);
+      }
+    }
+    
+    // Set up event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set up action buttons
+      document.getElementById('simulate-memory').addEventListener('click', () => {
+        triggerIncident('memory-leak', 'HIGH', 'us-east-1');
+      });
+      
+      document.getElementById('simulate-api').addEventListener('click', () => {
+        triggerIncident('api-failure', 'MEDIUM', 'us-west-1');
+      });
+      
+      document.getElementById('refresh-dashboard').addEventListener('click', fetchIncidents);
+      
+      // Initial load of incidents
+      fetchIncidents();
+      
+      // Set up more frequent polling for better real-time updates
+      pollingInterval = setInterval(fetchIncidents, 2000);
+      
+      // Also set up a separate polling for the selected incident details
+      incidentDetailsInterval = setInterval(() => {
+        if (selectedIncidentId && selectedIncidentId !== 'static-incident') {
+          fetchIncidentDetails(selectedIncidentId);
+        }
+      }, 1000);
+    });
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      if (incidentDetailsInterval) {
+        clearInterval(incidentDetailsInterval);
+      }
+    });
+  </script>
+</body>
+</html> 

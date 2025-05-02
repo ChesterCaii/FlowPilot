@@ -33,11 +33,23 @@ async function startServer() {
   // Serve static files
   app.use(express.static(path.join(__dirname, '../public')));
   
+  // Ensure directories exist
+  const diagramsDir = path.join(__dirname, '../diagrams');
+  const audioDir = path.join(__dirname, '../audio');
+  
+  if (!fs.existsSync(diagramsDir)) {
+    fs.mkdirSync(diagramsDir, { recursive: true });
+  }
+  
+  if (!fs.existsSync(audioDir)) {
+    fs.mkdirSync(audioDir, { recursive: true });
+  }
+  
   // Serve diagram files
-  app.use('/diagrams', express.static(path.join(__dirname, '../diagrams')));
+  app.use('/diagrams', express.static(diagramsDir));
   
   // Serve audio files
-  app.use('/audio', express.static(path.join(__dirname, '../audio')));
+  app.use('/audio', express.static(audioDir));
 
   // API endpoint to trigger an alarm
   app.post("/alarm", async (req: Request, res: Response) => {
@@ -74,7 +86,7 @@ async function startServer() {
   });
   
   // API endpoint to get all incidents
-  app.get("/api/incidents", (_req: Request, res: Response) => {
+  app.get("/api/incidents", (req: Request, res: Response) => {
     res.json(incidents);
   });
   
@@ -90,7 +102,6 @@ async function startServer() {
     let audio = null;
     
     // Find latest diagram for this incident
-    const diagramsDir = path.join(__dirname, '../diagrams');
     if (fs.existsSync(diagramsDir)) {
       const files = fs.readdirSync(diagramsDir);
       // Look for diagrams with timestamp close to the incident time
@@ -107,7 +118,6 @@ async function startServer() {
     }
     
     // Find latest audio for this incident
-    const audioDir = path.join(__dirname, '../audio');
     if (fs.existsSync(audioDir)) {
       const files = fs.readdirSync(audioDir);
       // Look for audio with timestamp close to the incident time
@@ -123,7 +133,7 @@ async function startServer() {
       }
     }
     
-    res.json({
+    return res.json({
       ...incident,
       artifacts: {
         diagram,
@@ -145,12 +155,27 @@ async function startServer() {
     incident.decision = decision;
     incident.result = result;
     
-    res.json(incident);
+    return res.json(incident);
   });
   
   // Serve the main app for any other route
-  app.get('*', (_req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, '../public/index.html'));
+  app.get('/', (req: Request, res: Response) => {
+    return res.sendFile(path.join(__dirname, '../public/static-dashboard.html'));
+  });
+  
+  // Serve the dashboard directly
+  app.get('/dashboard', (req: Request, res: Response) => {
+    return res.sendFile(path.join(__dirname, '../public/static-dashboard.html'));
+  });
+  
+  // Explicit route for static dashboard
+  app.get('/static-dashboard.html', (req: Request, res: Response) => {
+    return res.sendFile(path.join(__dirname, '../public/static-dashboard.html'));
+  });
+  
+  // Fallback for any other routes
+  app.get('*', (req: Request, res: Response) => {
+    return res.sendFile(path.join(__dirname, '../public/static-dashboard.html'));
   });
 
   // 3. listen

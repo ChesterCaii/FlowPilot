@@ -1,0 +1,25 @@
+
+    +---------------------+      +---------------------+
+    |                     |      |                     |
+    |     API Service     |<---->|    Database Server  |
+    |                     |      |                     |
+    +---------------------+      +---------------------+
+             ^                           ^
+             |                           |
+             v                           v
+    +---------------------+      +---------------------+
+    |                     |      |                     |
+    |    Worker Pods      |<---->|  Monitoring System  |
+    |   [MEMORY LEAK]     |      |                     |
+    +---------------------+      +---------------------+
+     
+    +------------------------------------------+
+    | Memory Leak Analysis:                    |
+    | - Process using excessive memory         |
+    | - Memory growing uncontrollably          |
+    | - High risk of OOM crash                 |
+    | - Remediation: Restart affected service  |
+    +------------------------------------------+
+    
+    Incident: ✅ Rebooted memory-leak at 2025-05-02T05:48:59.052Z. Result: Secure execution completed: pod restarted successfully
+    

@@ -1,0 +1,1 @@
+Demonstrating MCP and A2A protocol for agent to agent communication. This enables FlowPilot to collaborate with other specialized agents.
