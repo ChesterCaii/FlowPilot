@@ -1,0 +1,18 @@
+# Node deps
+node_modules/
+
+# Build output
+dist/
+
+# Temp files
+*.log
+*.tsbuildinfo
+
+# Local env vars
+.env
+
+# VS Code settings
+.vscode/
+
+# OS files
+.DS_Store

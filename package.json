@@ -1,0 +1,24 @@
+{
+  "name": "flowpilot",
+  "version": "1.0.0",
+  "description": "MCP-enabled incident response agent",
+  "main": "index.js",
+  "scripts": {
+    "dev:temporal": "temporal server start-dev",
+    "dev:api": "ts-node-dev src/agent.ts",
+    "dev:worker": "ts-node-dev src/worker.ts"
+  },
+  "keywords": [],
+  "author": "Chester Cai",
+  "license": "ISC",
+  "dependencies": {
+    "@temporalio/client": "^1.11.7",
+    "@temporalio/worker": "^1.11.7",
+    "body-parser": "^1.20.3",
+    "dotenv": "^16.5.0",
+    "express": "^4.19.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3",
+    "@aws-sdk/bedrock-runtime": "^3.521.0"
+  }
+}
