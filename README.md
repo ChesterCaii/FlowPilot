@@ -23,7 +23,7 @@ Built on Temporal for durable workflows and wrapped in MCP so the LLM can direct
 - ⏱️ **Durable Workflows**: Built on Temporal to ensure reliable execution even during failures
 - 🖥️ **Interactive Dashboard**: Web UI to monitor incidents, view diagrams, and hear voice alerts
 
-## Sponsor Integrations
+## Integrations
 
 - **Temporal**: Core workflow orchestration with durable execution and retries
 - **AWS Bedrock**: AI decisioning using Claude 3 Sonnet model
@@ -158,16 +158,6 @@ Run a full demo with `./demo.sh` and select option 5.
 - `/public` - Web UI dashboard
 - `/diagrams` - Generated system visualizations (created at runtime)
 - `/audio` - Generated voice alerts (created at runtime)
-
-## Hackathon Information
-
-This project was created for the AI Agents Hackathon. It targets multiple sponsor prizes:
-
-- Temporal ($2,000): Core workflow orchestration
-- Rime ($2,000): Voice alerts for incidents
-- DeepL ($1,000-1,500): Multi-language translation
-- Block/Goose ($1,000): Secure command execution
-- guMCP: Standardized agent-to-agent communication
 
 ## License
 
