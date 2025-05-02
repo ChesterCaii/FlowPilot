@@ -24,18 +24,19 @@ export const decideAction = withMcp("decideAction", async (
 ): Promise<"REBOOT" | "IGNORE"> => {
   console.log(`Deciding action for ${metricName}`);
 
+  // Get model information
+  const modelId = process.env.BEDROCK_MODEL_ID || "amazon.titan-text-premier-v1:0";
+  console.log(`DEBUG: Using model: ${modelId} in region: ${process.env.AWS_REGION}`);
+
+  // Prepare the prompt
   const prompt = `Alert received: ${metricName}
 Should I REBOOT or IGNORE? Respond with exactly one word: REBOOT or IGNORE.`;
 
-  // Debug: show which model & region we're using
-  const modelId = process.env.BEDROCK_MODEL_ID || "amazon.titan-text-express-v1";
-  console.log(`DEBUG: Using model: ${modelId} in region: ${process.env.AWS_REGION}`);
-
-  // Build params based on model type
+  // Format the request based on model type
   let params: any;
   
   if (modelId.includes("titan")) {
-    console.log("Using Titan model format");
+    // For Titan models
     params = {
       modelId,
       contentType: "application/json",
@@ -51,7 +52,7 @@ Should I REBOOT or IGNORE? Respond with exactly one word: REBOOT or IGNORE.`;
       }),
     };
   } else if (modelId.includes("claude")) {
-    console.log("Using Claude model format");
+    // For Claude models
     params = {
       modelId,
       contentType: "application/json",
@@ -59,46 +60,54 @@ Should I REBOOT or IGNORE? Respond with exactly one word: REBOOT or IGNORE.`;
       body: JSON.stringify({
         anthropic_version: "bedrock-2023-05-31",
         max_tokens: 10,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "user", content: prompt }
+        ],
+        temperature: 0,
       }),
     };
   } else {
-    console.log("Using generic model format - defaulting to Titan");
+    // Fallback to a generic format
+    console.warn(`Unknown model type: ${modelId}, using generic format`);
     params = {
-      modelId: "amazon.titan-text-express-v1",
+      modelId,
       contentType: "application/json",
       accept: "application/json",
-      body: JSON.stringify({
-        inputText: prompt,
-        textGenerationConfig: {
-          maxTokenCount: 10,
-          stopSequences: [],
-          temperature: 0,
-          topP: 1.0,
-        },
-      }),
+      body: JSON.stringify({ prompt }),
     };
   }
 
-  // Debug: show exact payload sent to Bedrock
   console.log("❓ Bedrock request payload:", JSON.stringify(params, null, 2));
 
   try {
-    console.log("Invoking Bedrock…");
+    console.log("Invoking Bedrock...");
     const response = await (bedrock as any).invokeModel(params).promise();
     const body = JSON.parse(response.body.toString());
     console.log("✅ Bedrock raw response:", JSON.stringify(body, null, 2));
 
-    // Extract raw text depending on model type
-    let raw: string;
+    // Extract raw text based on model type
+    let raw = "";
     if (modelId.includes("titan")) {
-      raw = (body.outputText || body.results?.[0]?.outputText || "").trim().toUpperCase();
+      if (body.results && body.results.length > 0) {
+        raw = body.results[0].outputText || "";
+      } else if (body.outputText) {
+        raw = body.outputText;
+      }
     } else if (modelId.includes("claude")) {
-      raw = (body.content?.[0]?.text || "").trim().toUpperCase();
+      if (body.content && body.content.length > 0) {
+        raw = body.content[0].text || "";
+      }
     } else {
-      raw = (body.outputText || body.results?.[0]?.outputText || body.content?.[0]?.text || "").trim().toUpperCase();
+      // Generic extraction, trying common response formats
+      raw = body.output || body.completion || body.generated_text || body.text || "";
     }
 
+    if (!raw) {
+      console.log("Unexpected response format:", body);
+      raw = "IGNORE"; // Default
+    }
+
+    raw = raw.trim().toUpperCase();
     console.log(`Raw Bedrock response text: ${raw}`);
     return raw.includes("REBOOT") ? "REBOOT" : "IGNORE";
   } catch (err) {

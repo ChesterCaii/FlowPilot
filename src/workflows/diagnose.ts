@@ -6,6 +6,8 @@ const {
   decideAction, 
   executeCommand,      
   summarize,
+  generateDiagram,
+  speakAlert,
   logEvaluation 
 } = proxyActivities<Activities>({
   startToCloseTimeout: "1 minute",
@@ -36,14 +38,28 @@ export async function diagnose(metricName: string): Promise<void> {
     report = `ℹ️ Ignored ${metricName} at ${new Date().toISOString()}, determined no action needed.`;
   }
 
-  // Step 3: Generate multi-language summary and visualizations
-  await summarize(report);
+  // Step 3: Generate multi-language summary
+  const translations = await summarize(report);
   
-  // Step 4: Log the evaluation metrics for learning
+  // Step 4: Generate visualization diagram
+  const diagramPath = await generateDiagram(report);
+  
+  // Step 5: Generate voice alert
+  await speakAlert(report);
+  
+  // Step 6: Log the evaluation metrics for learning
   await logEvaluation({
     metric: metricName,
     decision: decision,
     result: result,
     correct: success
+  });
+  
+  // Return additional info for debugging
+  console.log("Workflow completed with:", {
+    decision,
+    translations,
+    diagramPath,
+    success
   });
 }
