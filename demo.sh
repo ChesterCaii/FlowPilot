@@ -57,6 +57,36 @@ check_service "temporal server" "Temporal server"
 check_service "ts-node-dev src/worker.ts" "Worker process"
 check_service "ts-node-dev src/agent.ts" "API server"
 
+# Open the Web UI
+open_web_ui() {
+  echo -e "\n${CYAN}Opening FlowPilot Web UI...${NC}"
+  
+  # Detect OS and open browser accordingly
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    open "http://localhost:3000"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux
+    xdg-open "http://localhost:3000" &> /dev/null
+  elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    # Windows
+    start "http://localhost:3000"
+  else
+    echo -e "${YELLOW}Please open http://localhost:3000 in your browser${NC}"
+  fi
+  
+  # Open Temporal UI as well
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    open "http://localhost:8233"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    xdg-open "http://localhost:8233" &> /dev/null
+  elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    start "http://localhost:8233"
+  else
+    echo -e "${YELLOW}Please open http://localhost:8233 to view Temporal UI${NC}"
+  fi
+}
+
 # Demo functions
 demo_memory_leak() {
   echo -e "\n${YELLOW}===== DEMO SCENARIO 1: Memory Leak Alert =====${NC}"
@@ -106,6 +136,8 @@ demo_memory_leak() {
   else
     echo -e "${RED}✗ No audio alert generated${NC}"
   fi
+  
+  echo -e "${CYAN}Check the web UI to see the incident details!${NC}"
 }
 
 demo_api_failure() {
@@ -141,6 +173,8 @@ demo_api_failure() {
     sleep 1
   done
   echo ""
+  
+  echo -e "${CYAN}Check the web UI to see the incident details!${NC}"
 }
 
 demo_mcp_integration() {
@@ -155,25 +189,31 @@ demo_mcp_integration() {
 
 # Main demo sequence
 echo -e "\n${GREEN}Demo is ready to run! Choose a scenario:${NC}"
-echo -e "  ${CYAN}1. Memory Leak Alert${NC}"
-echo -e "  ${CYAN}2. API Failure Alert${NC}"
-echo -e "  ${CYAN}3. MCP/A2A Protocol Demo${NC}"
-echo -e "  ${CYAN}4. Run All Demos${NC}"
+echo -e "  ${CYAN}1. Launch Web UI${NC}"
+echo -e "  ${CYAN}2. Memory Leak Alert${NC}"
+echo -e "  ${CYAN}3. API Failure Alert${NC}"
+echo -e "  ${CYAN}4. MCP/A2A Protocol Demo${NC}"
+echo -e "  ${CYAN}5. Run Full Demo (Web UI + All Scenarios)${NC}"
 echo -e "  ${CYAN}0. Exit${NC}"
 
-read -p "Enter your choice (0-4): " choice
+read -p "Enter your choice (0-5): " choice
 
 case $choice in
   1)
-    demo_memory_leak
+    open_web_ui
     ;;
   2)
-    demo_api_failure
+    demo_memory_leak
     ;;
   3)
-    demo_mcp_integration
+    demo_api_failure
     ;;
   4)
+    demo_mcp_integration
+    ;;
+  5)
+    open_web_ui
+    sleep 3
     demo_memory_leak
     sleep 3
     demo_api_failure
