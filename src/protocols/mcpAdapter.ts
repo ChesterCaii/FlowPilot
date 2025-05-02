@@ -4,18 +4,24 @@ import { v4 as uuidv4 } from 'uuid';
 /**
  * MCPStreamer - Implements the Machine-Centric Protocol for agent-to-agent communication
  * This enables FlowPilot to communicate with other agents in a standardized way
+ * 
+ * Now with Gumloop guMCP integration for the $500 prize
  */
 export class MCPStreamer {
   private streamId: string;
   private serverUrl: string;
+  private gumloopUrl: string;
   private streams: Map<string, any[]>;
 
-  constructor(serverUrl: string = process.env.MCP_SERVER_URL || 'http://localhost:3001/mcp') {
+  constructor(serverUrl: string = process.env.MCP_SERVER_URL || 'http://localhost:3001/mcp', 
+              gumloopUrl: string = process.env.GUMLOOP_URL || 'https://gumloop.com/api/gumcp') {
     this.streamId = uuidv4();
     this.serverUrl = serverUrl;
+    this.gumloopUrl = gumloopUrl;
     this.streams = new Map();
     
     console.log(`🔌 MCP Streamer initialized with ID: ${this.streamId}`);
+    console.log(`🔌 Gumloop guMCP integration enabled at: ${this.gumloopUrl}`);
   }
 
   /**
@@ -25,41 +31,132 @@ export class MCPStreamer {
     const streamId = `${streamName}-${uuidv4()}`;
     this.streams.set(streamId, []);
     console.log(`🔌 MCP Stream created: ${streamId}`);
+    
+    // Register with Gumloop if enabled
+    this._registerWithGumloop(streamId, streamName);
+    
     return streamId;
+  }
+  
+  /**
+   * Register stream with Gumloop guMCP servers
+   */
+  private async _registerWithGumloop(streamId: string, streamName: string): Promise<void> {
+    if (process.env.GUMLOOP_KEY) {
+      try {
+        console.log(`🔄 Registering stream ${streamId} with Gumloop guMCP servers...`);
+        
+        const response = await axios.post(
+          `${this.gumloopUrl}/streams/register`,
+          {
+            streamId,
+            streamName,
+            agentId: 'flowpilot',
+            metadata: {
+              description: `FlowPilot incident stream for ${streamName}`,
+              createdAt: new Date().toISOString()
+            }
+          },
+          {
+            headers: {
+              "Authorization": `Bearer ${process.env.GUMLOOP_KEY}`,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+        
+        console.log(`✅ Successfully registered with Gumloop guMCP: ${response.status}`);
+      } catch (err) {
+        console.error(`❌ Failed to register with Gumloop guMCP:`, err);
+      }
+    }
   }
 
   /**
-   * Publishes a message to an MCP stream
+   * Publishes a message to the specified stream
+   * Also sends to Gumloop guMCP servers if enabled
    */
   async publish(streamId: string, message: any): Promise<void> {
+    // Add message to local stream
     const stream = this.streams.get(streamId) || [];
-    
-    const mcpMessage = {
-      id: uuidv4(),
-      timestamp: new Date().toISOString(),
-      data: message,
-      schema: 'flowpilot-v1'
+    const messageWithMeta = {
+      ...message,
+      timestamp: message.timestamp || new Date().toISOString(),
+      id: uuidv4()
     };
     
-    stream.push(mcpMessage);
+    stream.push(messageWithMeta);
     this.streams.set(streamId, stream);
     
-    console.log(`🔌 MCP Message published to stream ${streamId}:`, JSON.stringify(mcpMessage, null, 2));
+    console.log(`📝 MCP message published to stream ${streamId}`);
     
-    // In a real implementation, we'd send this to an MCP server
-    // For demo purposes, we'll just log it
-    
-    try {
-      // Attempt to publish to MCP server if URL exists, otherwise just log
-      if (this.serverUrl && this.serverUrl !== 'http://localhost:3001/mcp') {
-        await axios.post(`${this.serverUrl}/publish`, {
-          streamId,
-          message: mcpMessage
-        });
+    // Publish to gumloop if enabled
+    if (process.env.GUMLOOP_KEY) {
+      try {
+        console.log(`🔄 Publishing to Gumloop guMCP...`);
+        
+        await axios.post(
+          `${this.gumloopUrl}/streams/${streamId}/publish`,
+          {
+            message: {
+              ...messageWithMeta,
+              agentId: 'flowpilot'
+            }
+          },
+          {
+            headers: {
+              "Authorization": `Bearer ${process.env.GUMLOOP_KEY}`,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+        
+        console.log(`✅ Message published to Gumloop guMCP`);
+      } catch (err) {
+        console.error(`❌ Failed to publish to Gumloop guMCP:`, err);
       }
-    } catch (err) {
-      console.log(`⚠️ Failed to publish to MCP server: ${err}`);
     }
+  }
+
+  /**
+   * Creates an artifact in the MCP system
+   */
+  async createArtifact(type: string, data: any): Promise<string> {
+    const artifactId = `${type}-${uuidv4()}`;
+    
+    console.log(`🏺 MCP Artifact created: ${artifactId}`);
+    
+    // Create artifact in gumloop if enabled
+    if (process.env.GUMLOOP_KEY) {
+      try {
+        console.log(`🔄 Creating artifact in Gumloop guMCP...`);
+        
+        await axios.post(
+          `${this.gumloopUrl}/artifacts/create`,
+          {
+            artifactId,
+            artifactType: type,
+            data,
+            agentId: 'flowpilot',
+            metadata: {
+              createdAt: new Date().toISOString()
+            }
+          },
+          {
+            headers: {
+              "Authorization": `Bearer ${process.env.GUMLOOP_KEY}`,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+        
+        console.log(`✅ Artifact created in Gumloop guMCP`);
+      } catch (err) {
+        console.error(`❌ Failed to create artifact in Gumloop guMCP:`, err);
+      }
+    }
+    
+    return artifactId;
   }
 
   /**
@@ -81,30 +178,7 @@ export class MCPStreamer {
     await this.publish(streamId, a2aMessage);
     console.log(`🔄 A2A Notification sent to ${agentId}`);
   }
-  
-  /**
-   * Creates an artifact in the MCP stream
-   */
-  async createArtifact(artifactType: string, content: any): Promise<string> {
-    const artifactId = `artifact-${uuidv4()}`;
-    const streamId = this.createStream(`artifacts-${artifactType}`);
-    
-    const artifact = {
-      id: artifactId,
-      type: artifactType,
-      content,
-      created: new Date().toISOString()
-    };
-    
-    await this.publish(streamId, {
-      type: 'ARTIFACT_CREATED',
-      artifact
-    });
-    
-    console.log(`🏺 MCP Artifact created: ${artifactId} (${artifactType})`);
-    return artifactId;
-  }
-  
+
   /**
    * Gets all messages from a stream
    */
@@ -117,25 +191,47 @@ export class MCPStreamer {
 export const mcpStreamer = new MCPStreamer();
 
 /**
- * A2A Notifier - Helper for agent-to-agent communication
+ * Agent-to-Agent (A2A) Notifier Helper
  */
 export class A2ANotifier {
+  private streamer: MCPStreamer;
+  
+  constructor(streamer: MCPStreamer = mcpStreamer) {
+    this.streamer = streamer;
+  }
+  
+  async notifySystemAgent(command: string): Promise<void> {
+    await this.streamer.notifyAgent('system-agent', { command });
+    console.log(`📢 System agent notified to execute: ${command}`);
+  }
+  
+  async notifyAlertAgent(message: string, severity: string): Promise<void> {
+    await this.streamer.notifyAgent('alert-agent', { message, severity });
+    console.log(`📢 Alert agent notified with message: ${message}`);
+  }
+  
+  /**
+   * Create a task to be executed by one or more agents
+   */
   static async createTask(options: {
     type: string;
     agents: string[];
     data?: any;
-  }): Promise<A2ATask> {
+  }): Promise<TaskHelper> {
     const taskId = uuidv4();
     console.log(`🤝 A2A Task created: ${taskId} (${options.type})`);
     
-    return new A2ATask(taskId, options);
+    return new TaskHelper(taskId, options);
   }
 }
+
+// Export A2A notifier instance
+export const a2aNotifier = new A2ANotifier();
 
 /**
  * Represents an A2A task for inter-agent communication
  */
-class A2ATask {
+class TaskHelper {
   private id: string;
   private options: any;
   
