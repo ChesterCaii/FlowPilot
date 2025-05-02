@@ -22,6 +22,7 @@ Built on Temporal for durable workflows and wrapped in MCP so the LLM can direct
 - 🔊 **Voice Alerts**: Converts incident reports to voice alerts using Rime
 - 📈 **Evaluation Metrics**: Logs decision quality to Arize for continuous improvement
 - ⏱️ **Durable Workflows**: Built on Temporal to ensure reliable execution even during failures
+- 🖥️ **Interactive Dashboard**: Web UI to monitor incidents, view diagrams, and hear voice alerts
 
 ## Sponsor Integrations
 
@@ -32,6 +33,7 @@ Built on Temporal for durable workflows and wrapped in MCP so the LLM can direct
 - **Vizcom**: Diagram generation for visual incident representation
 - **Rime**: Voice alert generation for audible notifications
 - **Arize**: Evaluation metrics for AI decision quality
+- **MCP/A2A Protocol**: Standardized agent-to-agent communication
 
 ## Setup Instructions
 
@@ -81,6 +83,14 @@ BLOCK_GOOSE_API_KEY=your_goose_api_key
 
 ### Running the Application
 
+1. Use our all-in-one demo script
+```bash
+chmod +x demo.sh
+./demo.sh
+```
+
+Or run services individually:
+
 1. Start Temporal server (in a separate terminal)
 ```bash
 npm run dev:temporal
@@ -96,10 +106,28 @@ npm run dev:worker
 npm run dev:api
 ```
 
-4. Trigger a test incident
+4. Access the Web UI
+```bash
+open http://localhost:3000
+```
+
+5. Trigger a test incident
 ```bash
 curl -X POST http://localhost:3000/alarm -H "Content-Type: application/json" -d '{"AlarmName": "high-cpu-usage"}'
 ```
+
+## Interactive Web Dashboard
+
+The FlowPilot web dashboard provides a real-time view of your incident response system:
+
+- **Incident Monitoring**: View all current and past incidents
+- **AI Decision Tracking**: See what decisions were made for each alert
+- **Visualization**: View system diagrams of affected components
+- **Voice Playback**: Listen to voice alerts directly in the browser
+- **Quick Actions**: Trigger test alerts to see the system in action
+- **Integration Status**: See which sponsor integrations are active
+
+Access the dashboard at http://localhost:3000 when the API server is running.
 
 ## Testing
 
@@ -121,7 +149,10 @@ For hackathon demonstrations, we've prepared several scenarios:
 
 1. **High CPU Usage**: Simulates a service with excessive CPU consumption
 2. **Memory Leak**: Demonstrates the system detecting and remedying a memory leak
-3. **Database Connection Failure**: Shows how the system handles connectivity issues
+3. **API Failure**: Shows how the system handles connectivity issues
+4. **MCP/A2A Protocol Demo**: Demonstrates agent-to-agent communication
+
+Run a full demo with `./demo.sh` and select option 5.
 
 ## Project Structure
 
@@ -131,6 +162,9 @@ For hackathon demonstrations, we've prepared several scenarios:
   - `/worker.ts` - Temporal worker configuration
   - `/mcp.ts` - MCP wrapper for activities
   - `/workflows/diagnose.ts` - Main workflow definition
+  - `/protocols/mcpAdapter.ts` - MCP/A2A protocol implementation
+  - `/mcp-integration.ts` - MCP demo functionality
+- `/public` - Web UI dashboard
 - `/diagrams` - Generated system visualizations (created at runtime)
 - `/audio` - Generated voice alerts (created at runtime)
 
